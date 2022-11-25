@@ -1,7 +1,9 @@
 package com.example.springbootjdbc.controllers;
 
 import com.example.springbootjdbc.entities.Tutorial;
-import com.example.springbootjdbc.repositories.TutorialRepository;
+import com.example.springbootjdbc.models.CreateTutorialModel;
+import com.example.springbootjdbc.models.UpdateTutorialModel;
+import com.example.springbootjdbc.services.TutorialService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,23 +16,18 @@ import java.util.List;
 @RequestMapping("/api")
 public class TutorialController {
     @Autowired
-    TutorialRepository tutorialRepository;
+    TutorialService tutorialService;
 
     @GetMapping("/tutorials")
     public ResponseEntity<List<Tutorial>> getAllTutorials(@RequestParam(required = false) String title) {
 
         try {
-            List<Tutorial> tutorials = new ArrayList<Tutorial>();
-
-            if (title == null)
-                tutorialRepository.findAll().forEach(tutorials::add);
-            else
-                tutorialRepository.findByTitleContaining(title).forEach(tutorials::add);
-
-            if (tutorials.isEmpty()) {
-                return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+            List<Tutorial> tutorials;
+            if (title == null) {
+                tutorials = tutorialService.FindAllTutorials();
+            } else {
+                tutorials = tutorialService.findTutorialsByTitleContaining(title);
             }
-
             return new ResponseEntity<>(tutorials, HttpStatus.OK);
         } catch (Exception e) {
             return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
@@ -39,7 +36,7 @@ public class TutorialController {
 
     @GetMapping("/tutorials/{id}")
     public ResponseEntity<Tutorial> getTutorialById(@PathVariable("id") long id) {
-        Tutorial tutorial = tutorialRepository.findById(id);
+        Tutorial tutorial = tutorialService.findTutorial(id);
 
         if (tutorial != null) {
             return new ResponseEntity<>(tutorial, HttpStatus.OK);
@@ -49,9 +46,9 @@ public class TutorialController {
     }
 
     @PostMapping("/tutorials")
-    public ResponseEntity<String> createTutorial(@RequestBody Tutorial tutorial) {
+    public ResponseEntity<String> createTutorial(@RequestBody CreateTutorialModel tutorial) {
         try {
-            tutorialRepository.save(new Tutorial(tutorial.getTitle(), tutorial.getDescription(), false));
+            tutorialService.saveTutorial(tutorial);
             return new ResponseEntity<>("Tutorial was created successfully.", HttpStatus.CREATED);
         } catch (Exception e) {
             return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
@@ -59,18 +56,11 @@ public class TutorialController {
     }
 
     @PutMapping("/tutorials/{id}")
-    public ResponseEntity<String> updateTutorial(@PathVariable("id") long id, @RequestBody Tutorial tutorial) {
-        Tutorial _tutorial = tutorialRepository.findById(id);
-
-        if (_tutorial != null) {
-            _tutorial.setId(id);
-            _tutorial.setTitle(tutorial.getTitle());
-            _tutorial.setDescription(tutorial.getDescription());
-            _tutorial.setPublished(tutorial.isPublished());
-
-            tutorialRepository.update(_tutorial);
+    public ResponseEntity<String> updateTutorial(@PathVariable("id") long id, @RequestBody UpdateTutorialModel tutorial) {
+        try {
+            tutorialService.updateTutorial(tutorial, id);
             return new ResponseEntity<>("Tutorial was updated successfully.", HttpStatus.OK);
-        } else {
+        } catch (RuntimeException ex){
             return new ResponseEntity<>("Cannot find Tutorial with id=" + id, HttpStatus.NOT_FOUND);
         }
     }
@@ -78,9 +68,9 @@ public class TutorialController {
     @DeleteMapping("/tutorials/{id}")
     public ResponseEntity<String> deleteTutorial(@PathVariable("id") long id) {
         try {
-            int result = tutorialRepository.deleteById(id);
+            int result = tutorialService.deleteTutorial(id);
             if (result == 0) {
-                return new ResponseEntity<>("Cannot find Tutorial with id=" + id, HttpStatus.OK);
+                return new ResponseEntity<>("Cannot find Tutorial with id=" + id, HttpStatus.BAD_REQUEST);
             }
             return new ResponseEntity<>("Tutorial was deleted successfully.", HttpStatus.OK);
         } catch (Exception e) {
@@ -91,7 +81,7 @@ public class TutorialController {
     @DeleteMapping("/tutorials")
     public ResponseEntity<String> deleteAllTutorials() {
         try {
-            int numRows = tutorialRepository.deleteAll();
+            int numRows = tutorialService.deleteAll();
             return new ResponseEntity<>("Deleted " + numRows + " Tutorial(s) successfully.", HttpStatus.OK);
         } catch (Exception e) {
             return new ResponseEntity<>("Cannot delete tutorials.", HttpStatus.INTERNAL_SERVER_ERROR);
@@ -102,11 +92,8 @@ public class TutorialController {
     @GetMapping("/tutorials/published")
     public ResponseEntity<List<Tutorial>> findByPublished() {
         try {
-            List<Tutorial> tutorials = tutorialRepository.findByPublished(true);
+            List<Tutorial> tutorials = tutorialService.findTurialsByPublishedStatus(true);
 
-            if (tutorials.isEmpty()) {
-                return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-            }
             return new ResponseEntity<>(tutorials, HttpStatus.OK);
         } catch (Exception e) {
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
